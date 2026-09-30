@@ -85,6 +85,8 @@
     document.getElementById('sideGroup').style.display = pve ? '' : 'none';
     reviewPanel.style.display = review ? '' : 'none';
     undoBtn.style.display = review ? 'none' : '';
+    speakBtn.style.display = pve ? '' : 'none';       // 朗读仅人机对战
+    restartBtn.style.display = review ? 'none' : '';  // 复盘隐藏重新开始
     aiComment.style.display = pve ? '' : 'none';
   }
 
