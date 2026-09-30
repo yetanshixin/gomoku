@@ -632,6 +632,24 @@ function pickBest(board, p, moves) {
   return best;
 }
 
+// 关键防守选点：对候选点做浅 minimax 验证，选全局最优（修复"pointScore 局部评分漏全局胜负"）
+// depth 建议 4（走 p 后对手再搜 depth-1 层）；候选多时受 deadline 截断
+function pickBestSearch(board, p, moves, depth) {
+  if (!moves.length) return null;
+  if (moves.length === 1) return moves[0];
+  const o = opp(p);
+  const deadline = Date.now() + 1200;
+  let best = moves[0], bestS = -Infinity;
+  for (const m of moves) {
+    if (Date.now() > deadline) break;
+    board[m.r][m.c] = p;
+    const v = -negamax(board, depth - 1, -Infinity, Infinity, o, m.r, m.c, deadline);
+    board[m.r][m.c] = EMPTY;
+    if (v > bestS) { bestS = v; best = m; }
+  }
+  return best;
+}
+
 // 判断 L 中是否存在包含 idx、且两端皆空的连续四（活四）
 function lineHasOpenFourAt(L, idx, p) {
   let s = idx, e = idx;
@@ -902,14 +920,14 @@ function getBestMove(board, p, difficulty, history) {
       const r = Math.floor(pt / SIZE), c = pt % SIZE;
       if (board[r][c] === EMPTY) cands.push({ r, c });
     }
-    const bt = pickBest(board, p, cands);
+    const bt = pickBestSearch(board, p, cands, 4);
     return { r: bt.r, c: bt.c, why: 'defense' };
   }
 
   // 堵对手活三（2 步威胁：活四→五连。先于我方双杀，因为对手活四会打断我方双杀）
   const oppThree = findFourMoves(board, o).filter(m => m.type === 'open4');
   if (oppThree.length) {
-    const bt = pickBest(board, p, oppThree);
+    const bt = pickBestSearch(board, p, oppThree, 4);
     return { r: bt.r, c: bt.c, why: 'defense' };
   }
 
@@ -937,7 +955,7 @@ function getBestMove(board, p, difficulty, history) {
       const r = Math.floor(pt / SIZE), c = pt % SIZE;
       if (board[r][c] === EMPTY) cands.push({ r, c });
     }
-    const bt = pickBest(board, p, cands);
+    const bt = pickBestSearch(board, p, cands, 4);
     return { r: bt.r, c: bt.c, why: 'defense' };
   }
 
