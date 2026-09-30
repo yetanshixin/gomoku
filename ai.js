@@ -342,6 +342,8 @@ let vctTT = null;
 const VCT_NODE_LIMIT = 1000000;
 const VCT_TIME_LIMIT = 5000;
 const VCT_DEPTH = 20;
+// 威胁等级排序权重（越急越先搜）：成五 > 活四/双杀 > 冲四 > 活三
+const LEVEL_ORDER = { five: 0, open4: 1, rush4: 2, live3: 3, none: 4 };
 
 // Zobrist 哈希（置换表用）
 const ZOBRIST = [];
@@ -420,21 +422,32 @@ function classifyThreat(board, r, c, p) {
   }
   const winning = five || openFour || fours >= 2 || (fours >= 1 && threes >= 1) || threes >= 2;
   const forcing = !winning && (fours >= 1 || threes >= 1);
+  // 威胁等级（急迫度）：five 成五 > open4 活四/双四/四三/三三 > rush4 冲四 > live3 活三
+  let level = 'none';
+  if (five) level = 'five';
+  else if (winning) level = 'open4';
+  else if (fours >= 1) level = 'rush4';
+  else if (threes >= 1) level = 'live3';
   // hard = 成五（这一手直接赢，无需验证）；活四/双四/四三/三三 都要验证防守方反击
-  return { winning, forcing, hard: five, exts: [...exts] };
+  return { winning, forcing, hard: five, level, exts: [...exts] };
 }
 
 // AND 节点：防守方所有应对是否都挡不住进攻方
-function defenderCantRefute(board, a, d, exts, depth, deadline) {
+// attackLevel = 进攻方当前威胁等级（five/open4/rush4/live3），用于判定防守方反造威胁是否"更快"
+function defenderCantRefute(board, a, d, exts, attackLevel, depth, deadline) {
   if (findWinningMove(board, d)) return false;  // 防守方能立即成五 → 反制
   const respSet = new Set(exts);
-  // 防守方反造威胁（成五/活四/冲四/活三）
+  // 防守方反冲四（仅在进攻方是活三时更急）→ 进攻方需堵其五连点后重新搜威胁，单独收集
+  const counterFours = [];
+  // 防守方反造威胁分级：只有"成五/活四级"永远反驳；"冲四"仅在进攻方是活三时反驳（冲四兑现快于活三）；
+  // "活三"反造威胁兑现慢于进攻方冲四/活四，不反驳（忽略，避免过度悲观）
   for (const m of getCandidates(board, 1)) {
     if (board[m.r][m.c] !== EMPTY || respSet.has(m.r * SIZE + m.c)) continue;
     board[m.r][m.c] = d;
     const cls = classifyThreat(board, m.r, m.c, d);
     board[m.r][m.c] = EMPTY;
-    if (cls.winning || cls.forcing) respSet.add(m.r * SIZE + m.c);
+    if (cls.hard || cls.winning) respSet.add(m.r * SIZE + m.c);
+    else if (cls.level === 'rush4' && attackLevel === 'live3') counterFours.push(cls.exts[0]);
   }
   let any = false;
   for (const pt of respSet) {
@@ -442,6 +455,16 @@ function defenderCantRefute(board, a, d, exts, depth, deadline) {
     if (board[r][c] !== EMPTY) continue;
     board[r][c] = d;
     const ok = vctWin(board, a, d, depth, deadline);
+    board[r][c] = EMPTY;
+    any = true;
+    if (!ok) return false;
+  }
+  // 防守方反冲四：进攻方先堵五连点（消耗一手），再重新搜威胁
+  for (const pt of counterFours) {
+    const r = Math.floor(pt / SIZE), c = pt % SIZE;
+    if (board[r][c] !== EMPTY) continue;
+    board[r][c] = a;
+    const ok = vctWin(board, a, d, depth - 1, deadline);
     board[r][c] = EMPTY;
     any = true;
     if (!ok) return false;
@@ -473,12 +496,13 @@ function vctWin(board, a, d, depth, deadline) {
     const cls = classifyThreat(board, m.r, m.c, a);
     board[m.r][m.c] = EMPTY;
     if (cls.winning && cls.hard) { result = true; break; }
-    if (cls.winning || cls.forcing) forcingMoves.push({ m, exts: cls.exts });
+    if (cls.winning || cls.forcing) forcingMoves.push({ m, level: cls.level, exts: cls.exts });
   }
   if (!result) {
-    for (const { m, exts } of forcingMoves) {
+    forcingMoves.sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]);
+    for (const { m, level, exts } of forcingMoves) {
       board[m.r][m.c] = a;
-      const win = defenderCantRefute(board, a, d, exts, depth - 1, deadline);
+      const win = defenderCantRefute(board, a, d, exts, level, depth - 1, deadline);
       board[m.r][m.c] = EMPTY;
       if (win) { result = true; break; }
     }
@@ -503,15 +527,16 @@ function findVCT(board, p, o) {
     const cls = classifyThreat(board, m.r, m.c, p);
     board[m.r][m.c] = EMPTY;
     if (cls.winning && cls.hard) return { r: m.r, c: m.c };
-    if (cls.winning || cls.forcing) forcingMoves.push({ m, exts: cls.exts });
+    if (cls.winning || cls.forcing) forcingMoves.push({ m, level: cls.level, exts: cls.exts });
   }
+  forcingMoves.sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]);
 
   // 迭代加深：从浅到深搜索强制威胁（复用已分类结果）
   for (let d = 4; d <= VCT_DEPTH; d += 2) {
     if (Date.now() > deadline) break;
-    for (const { m, exts } of forcingMoves) {
+    for (const { m, level, exts } of forcingMoves) {
       board[m.r][m.c] = p;
-      const win = defenderCantRefute(board, p, o, exts, d, deadline);
+      const win = defenderCantRefute(board, p, o, exts, level, d, deadline);
       board[m.r][m.c] = EMPTY;
       if (win) return { r: m.r, c: m.c };
     }
