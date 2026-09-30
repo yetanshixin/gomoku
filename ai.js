@@ -519,13 +519,31 @@ function findVCT(board, p, o) {
   return null;
 }
 
+// 生成搜索候选：把"堵对手威胁点"（五连/活四/冲四/双杀）排在前面，避免被 cap 剪掉
+// （否则对手的冲四五连点 pointScore 低、会被 cap 剪掉，导致搜索漏掉关键防守，误判对手必胜）
+function searchMoves(board, p) {
+  const o = opp(p);
+  const moves = getCandidates(board, 2);
+  const defSet = new Set();
+  for (const m of findWinningMoves(board, o)) defSet.add(m.r * SIZE + m.c);
+  for (const m of findFourMoves(board, o)) {
+    if (m.type === 'open4') defSet.add(m.r * SIZE + m.c);
+    else if (m.type === 'rush4' && m.block) defSet.add(m.block.r * SIZE + m.block.c);
+  }
+  const dbl = findDoubleThreatMove(board, o);
+  if (dbl) defSet.add(dbl.r * SIZE + dbl.c);
+  const defMoves = moves.filter(m => defSet.has(m.r * SIZE + m.c));
+  const others = orderMoves(board, moves.filter(m => !defSet.has(m.r * SIZE + m.c)), p, 14);
+  return defMoves.concat(others);
+}
+
 // Negamax + Alpha-Beta
 function negamax(board, depth, alpha, beta, color, lastR, lastC, deadline) {
   if (lastR >= 0 && isWinAt(board, lastR, lastC, opp(color))) return -WIN_SCORE - depth;
   if (depth <= 0) return evaluateBoard(board, color);
   if (Date.now() > deadline) return evaluateBoard(board, color);
 
-  const moves = orderMoves(board, getCandidates(board, 2), color, 14);
+  const moves = searchMoves(board, color);
   let best = -Infinity;
   for (const m of moves) {
     board[m.r][m.c] = color;
@@ -543,7 +561,7 @@ function negamax(board, depth, alpha, beta, color, lastR, lastC, deadline) {
 
 // 根节点搜索
 function minimaxRoot(board, p, depth, deadline) {
-  const moves = orderMoves(board, getCandidates(board, 2), p, 14);
+  const moves = searchMoves(board, p);
   if (moves.length === 0) return { move: null, score: 0 };
   let bestMove = moves[0], bestScore = -Infinity, alpha = -Infinity;
   for (const m of moves) {
