@@ -833,6 +833,13 @@ function getBestMove(board, p, difficulty, history) {
   const o = opp(p);
   const n = countStones(board);
 
+  // 白2 特殊处理：黑1 天元后，白棋走斜邻牵制（地毯谱 depth 会误选边中点 A8，实测黑棋反而最快赢）
+  if (p === WHITE && n === 1) {
+    const diag = [{ r: 6, c: 6 }, { r: 6, c: 8 }, { r: 8, c: 6 }, { r: 8, c: 8 }];
+    const m = diag.find(d => board[d.r][d.c] === EMPTY);
+    if (m) return { r: m.r, c: m.c, why: 'white2' };
+  }
+
   // 必胜地毯谱查表（无禁手黑棋必胜，优先于一切）
   if (history && history.length === n) {
     const cm = carpetMove(history, p);
@@ -976,6 +983,8 @@ function explainMove(mv, board, p) {
   switch (mv.why) {
     case 'first':
       return name + ' 占据天元：黑棋先手最稳的起手，向四个方向都能展开，也是花月/浦月必胜开局的第一步。';
+    case 'white2':
+      return name + ' 白②斜指牵制黑棋：斜邻是白棋最强的起手，封锁黑棋斜线发展，尽量拖慢黑棋的必胜。';
     case 'flower':
       return '花月开局第 3 手 ' + name + '：黑棋最强必胜开局之一（白②直指时用）。进入必胜谱库后，无论白棋怎么防，黑棋都沿谱必胜。';
     case 'pyel':
