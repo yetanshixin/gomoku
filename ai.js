@@ -833,11 +833,18 @@ function getBestMove(board, p, difficulty, history) {
   const o = opp(p);
   const n = countStones(board);
 
-  // 白2 特殊处理：黑1 天元后，白棋走斜邻牵制（地毯谱 depth 会误选边中点 A8，实测黑棋反而最快赢）
+  // 白2 特殊处理：走黑1 的斜邻牵制（地毯谱 depth 会误选边中点，实测黑棋反而最快赢）
   if (p === WHITE && n === 1) {
-    const diag = [{ r: 6, c: 6 }, { r: 6, c: 8 }, { r: 8, c: 6 }, { r: 8, c: 8 }];
-    const m = diag.find(d => board[d.r][d.c] === EMPTY);
-    if (m) return { r: m.r, c: m.c, why: 'white2' };
+    let b1 = null;
+    for (let r = 0; r < SIZE && !b1; r++) for (let c = 0; c < SIZE; c++) if (board[r][c] === BLACK) { b1 = { r, c }; break; }
+    if (b1) {
+      const diag = [
+        { r: b1.r - 1, c: b1.c - 1 }, { r: b1.r - 1, c: b1.c + 1 },
+        { r: b1.r + 1, c: b1.c - 1 }, { r: b1.r + 1, c: b1.c + 1 },
+      ];
+      const m = diag.find(d => inBoard(d.r, d.c) && board[d.r][d.c] === EMPTY);
+      if (m) return { r: m.r, c: m.c, why: 'white2' };
+    }
   }
 
   // 必胜地毯谱查表（无禁手黑棋必胜，优先于一切）
