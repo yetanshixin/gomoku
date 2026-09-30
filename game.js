@@ -18,7 +18,8 @@
   const reviewInput = document.getElementById('reviewInput');
   const loadReviewBtn = document.getElementById('loadReviewBtn');
   const reviewStep = document.getElementById('reviewStep');
-  const reviewError = document.getElementById('reviewError');
+  const loadReviewHint = document.getElementById('loadReviewHint');
+  const copyReviewHint = document.getElementById('copyReviewHint');
   const navStartBtn = document.getElementById('navStartBtn');
   const navPrevBtn = document.getElementById('navPrevBtn');
   const navNextBtn = document.getElementById('navNextBtn');
@@ -62,7 +63,8 @@
     reviewMoves = [];
     reviewIndex = 0;
     reviewStep.textContent = '第 0 / 0 步';
-    reviewError.textContent = '';
+    loadReviewHint.textContent = '';
+    copyReviewHint.textContent = '';
     clearAiComment();
   }
 
@@ -739,14 +741,21 @@
     render();
   }
 
+  // 提示文案显示在按钮右侧，2 秒后自动消失
+  function showHint(el, text) {
+    el.textContent = text;
+    clearTimeout(el._hintTimer);
+    el._hintTimer = setTimeout(() => { el.textContent = ''; }, 2000);
+  }
+
   function loadReview() {
     try {
       reviewMoves = parseGame(reviewInput.value);
       reviewIndex = 1; // 进入第一步
-      reviewError.textContent = '';
+      loadReviewHint.textContent = '';
       applyReviewIndex();
     } catch (e) {
-      reviewError.textContent = e.message;
+      showHint(loadReviewHint, e.message);
     }
   }
 
@@ -788,11 +797,11 @@
     // 复盘按钮：复制 reviewInput 内容到剪贴板
     copyReviewBtn.addEventListener('click', () => {
       const text = reviewInput.value.trim();
-      if (!text) { reviewError.textContent = '没有可复制的对局码'; return; }
+      if (!text) { showHint(copyReviewHint, '没有可复制的对局码'); return; }
       copyText(text).then(() => {
-        reviewError.textContent = '已复制到剪贴板 ✓';
+        showHint(copyReviewHint, '已复制到剪贴板 ✓');
       }, () => {
-        reviewError.textContent = '复制失败，请手动复制：' + text;
+        showHint(copyReviewHint, '复制失败，请手动复制：' + text);
       });
     });
 

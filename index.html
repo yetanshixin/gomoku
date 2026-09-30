@@ -34,7 +34,9 @@
       <textarea class="review-input" id="reviewInput" rows="2" placeholder="粘贴对局信息，如 G1:h8h9i9j8…"></textarea>
       <div class="review-row">
         <button class="btn review-btn" id="loadReviewBtn">加载复盘</button>
+        <span class="review-hint" id="loadReviewHint"></span>
         <button class="btn review-btn" id="copyReviewBtn">📋 复制对局</button>
+        <span class="review-hint" id="copyReviewHint"></span>
         <span class="review-step" id="reviewStep">第 0 / 0 步</span>
       </div>
       <div class="review-nav">
@@ -43,7 +45,6 @@
         <button class="btn review-nav-btn" id="navNextBtn">下一步 ▶</button>
         <button class="btn review-nav-btn" id="navEndBtn">跳至终盘 ⏭</button>
       </div>
-      <div class="review-error" id="reviewError"></div>
     </div>
 
     <div class="ai-comment" id="aiComment">

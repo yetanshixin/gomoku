@@ -366,6 +366,12 @@ body {
   white-space: nowrap;
 }
 
+.review-hint {
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .review-nav {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
