@@ -1,0 +1,19 @@
+# 逆向原始材料 / 大文件（运行时不需要）
+lib/
+classes.dex
+book2.bak.js
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 逆向调试脚本 / 临时文件
+unicorn_dec.py
+unicorn_full.py
+gen_book2.js
+test_diag4.js
+fiveteLog.txt
+
+# 系统文件
+.DS_Store
+Thumbs.db
